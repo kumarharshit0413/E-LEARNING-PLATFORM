@@ -19,6 +19,7 @@
     "mongodb": "^6.17.0",
     "mongoose": "^8.16.4",
     "multer": "^2.0.2",
-    "multer-storage-cloudinary": "^4.0.0"
+    "multer-storage-cloudinary": "^4.0.0",
+    "redis": "^5.8.2"
   }
 }

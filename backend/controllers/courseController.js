@@ -1,9 +1,11 @@
 const { ObjectId } = require('mongodb');
+const redisClient = require('../config/redis'); 
 
 // This function takes the database connection and returns an object with controller methods
 module.exports = function (db) {
   const courses = db.collection('courses');
   const users = db.collection('users');
+  const CACHE_KEY_COURSES = 'allCourses';
 
   return {
     /**
@@ -14,7 +16,7 @@ module.exports = function (db) {
     createCourse: async (req, res) => {
       try {
         const { title, description, category, lessons } = req.body;
-        const instructorId = req.user.userId; // Get instructor ID from authenticated user
+        const instructorId = req.user.userId; 
 
         if (!title || !description || !category) {
           return res.status(400).json({ error: "Title, description, and category are required" });
@@ -30,6 +32,10 @@ module.exports = function (db) {
         };
 
         const result = await courses.insertOne(newCourse);
+
+        await redisClient.del(CACHE_KEY_COURSES);
+        console.log('Course cache invalidated.');
+
         res.status(201).json({ message: "Course created successfully", courseId: result.insertedId });
 
       } catch (err) {
@@ -45,8 +51,20 @@ module.exports = function (db) {
      */
     getAllCourses: async (req, res) => {
       try {
-        const allCourses = await courses.find({}).toArray();
+        const cachedCourses = await redisClient.get(CACHE_KEY_COURSES);
+
+        if (cachedCourses) {
+          console.log('Serving courses from Redis cache...');
+          return res.status(200).json(JSON.parse(cachedCourses));
+        }
+
+        console.log('Serving courses from MongoDB...');
+        const allCourses = await courses.find({}).sort({ createdAt: -1 }).toArray();
+
+        await redisClient.setEx(CACHE_KEY_COURSES, 3600, JSON.stringify(allCourses));
+
         res.status(200).json(allCourses);
+
       } catch (err) {
         console.error("Get All Courses Error:", err);
         res.status(500).json({ error: "Internal server error" });
@@ -110,6 +128,9 @@ module.exports = function (db) {
             };
 
             await courses.updateOne({ _id: new ObjectId(courseId) }, { $set: updates });
+
+            await redisClient.del(CACHE_KEY_COURSES);
+            console.log('Course cache invalidated.');
 
             res.status(200).json({ message: "Course updated successfully" });
 
@@ -287,7 +308,10 @@ module.exports = function (db) {
 
             await courses.deleteOne({ _id: new ObjectId(courseId) });
 
-            res.status(200).json({ message: "Course deleted successfully" });
+            await redisClient.del(CACHE_KEY_COURSES);
+            console.log('Course cache invalidated.');
+            
+            res.status(200).json({ message: 'Course deleted successfully' });
 
         } catch (err) {
             console.error("Delete Course Error:", err);
