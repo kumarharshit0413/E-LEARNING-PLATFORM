@@ -4,11 +4,11 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
-const PORT = 5000;
+// Make sure to set the PORT in your Render environment variables as well
+const PORT = process.env.PORT || 5000; 
 
 const uri = process.env.MONGO_URI;
 
-// Use the modern serverApi configuration
 const clientOptions = {
   serverApi: {
     version: '1',
@@ -20,7 +20,15 @@ const clientOptions = {
 const client = new MongoClient(uri, clientOptions);
 const dbName = 'elearning';
 
-app.use(cors());
+const frontendURL = process.env.FRONTEND_URL; 
+
+const corsOptions = {
+  origin: frontendURL
+};
+
+app.use(cors(corsOptions));
+
+
 app.use(express.json());
 
 async function startServer() {
@@ -47,7 +55,7 @@ async function startServer() {
     });
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server is running at http://localhost:${PORT}`);
+      console.log(`🚀 Server is running on port ${PORT}`);
     });
   } catch (err) {
     console.error("❌ Failed to connect to MongoDB:", err);
